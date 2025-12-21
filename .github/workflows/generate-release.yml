@@ -1,0 +1,40 @@
+on:
+  workflow_call:
+    inputs:
+      tag_name:
+        description: "Release tag"
+        default: '${{ github.ref_name }}'
+        required: false
+        type: string
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: ${{ github.workspace }}/artifacts
+
+      - name: Generate release notes
+        id: release_notes
+        uses: Ludovic-Lesur/actions/generate-release-notes@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ inputs.tag_name }}
+          tag_name: ${{ inputs.tag_name }}
+          body: ${{ steps.release_notes.outputs.release_body }}
+          files: ${{ github.workspace }}/artifacts/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

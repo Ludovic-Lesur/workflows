@@ -1,0 +1,46 @@
+on:
+  workflow_call:
+    inputs:
+      json_file_path:
+        description: "Input JSON file"
+        default: '.github/matrices/cmake-flags.json'
+        required: false
+        type: string
+    outputs:
+      matrix:
+        description: "CMake compilation flags files matrix"
+        value: ${{ jobs.generate.outputs.matrix }}
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate CMake compilation flags files
+        uses: Ludovic-Lesur/actions/generate-cmake-flags-files@master
+        with:
+          json_file_path: ${{ inputs.json_file_path }}
+          output_folder_path: '${{ github.workspace }}/cmake-flags-files'
+
+      - name: Build files matrix
+        id: build-matrix
+        run: |
+          flags_files_list=()
+          for file in ${{ github.workspace }}/cmake-flags-files/*.txt; do
+            flags_files_list+=("$(basename "$file")")
+          done
+          matrix_json=$(printf '"%s"\n' "${flags_files_list[@]}" | jq -s -c .)
+          echo "matrix=$matrix_json" >> $GITHUB_OUTPUT
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: cmake-flags-files
+          retention-days: 1
+          path: |
+            ${{github.workspace}}/cmake-flags-files/*.txt
